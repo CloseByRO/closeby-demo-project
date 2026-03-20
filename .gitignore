@@ -1,3 +1,7 @@
+# TypeScript build cache
+tsconfig.tsbuildinfo
+*.tsbuildinfo
+
 # dependencies
 node_modules/
 .pnp

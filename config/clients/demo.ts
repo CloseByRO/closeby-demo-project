@@ -143,27 +143,52 @@ export const demoConfig: ClientConfig = {
     {
       question: 'Cât durează o ședință de psihoterapie?',
       answer:
-        'O ședință standard durează 50 de minute. Prima ședință (consultația inițială gratuită) durează 30 de minute și ne permite să ne cunoaștem și să evaluăm dacă putem lucra împreună.',
+        'O ședință standard durează 50 de minute. Prima ședință (consultația inițială gratuită) durează 30 de minute și ne permite să ne cunoaștem și să evaluăm dacă putem lucra împreună. Ședința de terapie de cuplu durează 75 de minute.',
     },
     {
-      question: 'Cât costă o ședință? Există prețuri transparente?',
+      question: 'Cât costă o ședință de psihoterapie în Sectorul 3, București?',
       answer:
-        'Toate prețurile sunt afișate transparent: consultație inițială gratuită, ședință individuală 280 RON / 50 min, terapie de cuplu 390 RON / 75 min. Plata se face la finalul ședinței, numerar sau transfer bancar.',
+        'La cabinetul Dr. Ana Ionescu din zona Pallady, Sector 3: consultația inițială este gratuită (30 min), ședința individuală CBT costă 280 RON / 50 min, terapia de cuplu 390 RON / 75 min, iar ședința online 250 RON. Plata se face la finalul ședinței, numerar sau transfer bancar. Nu există costuri ascunse.',
     },
     {
-      question: 'Este confidențial ce discutăm?',
+      question: 'Este confidențial ce discutăm la psihoterapeut?',
       answer:
-        'Da, absolut. Confidențialitatea este o obligație deontologică fundamentală, conform Codului Colegiului Psihologilor din România. Tot ce discutăm rămâne strict între noi, cu excepțiile legale prevăzute de lege.',
+        'Da, absolut. Confidențialitatea este o obligație deontologică fundamentală, conform Codului Colegiului Psihologilor din România. Tot ce discutăm rămâne strict între noi, cu excepțiile legale prevăzute de lege (pericol iminent pentru propria persoană sau pentru alții). Nu partajăm informații cu terți fără consimțământul dumneavoastră explicit.',
     },
     {
-      question: 'Cum se desfășoară prima ședință?',
+      question: 'Cum se desfășoară prima ședință de terapie?',
       answer:
-        'La prima întâlnire ne cunoaștem și discuți despre ceea ce te-a determinat să apelezi la terapie. Nu există întrebări greșite. Vei pleca cu claritate despre ce presupune procesul și cu un plan inițial de lucru.',
+        'La prima întâlnire (gratuită, 30 min) ne cunoaștem și discuți despre ceea ce te-a determinat să apelezi la terapie. Nu există întrebări greșite sau teme interzise. Vei pleca cu claritate despre ce presupune procesul terapeutic, cu un plan inițial de lucru și cu răspuns la întrebarea dacă terapia cognitiv-comportamentală este potrivită pentru situația ta.',
     },
     {
-      question: 'Datele mele sunt în siguranță?',
+      question: 'Datele mele personale sunt în siguranță când mă programez online?',
       answer:
-        'Sistemul de programare online folosește servere localizate în Frankfurt, Germania, în conformitate cu GDPR. Nu stocăm informații clinice sau diagnostice — doar datele de contact necesare programării.',
+        'Sistemul de programare online folosește Cal.com EU, cu servere localizate în Frankfurt, Germania, în conformitate cu GDPR. Nu stocăm informații clinice sau diagnostice — doar datele de contact necesare programării (nume, email, telefon). Toate datele sunt procesate de CloseBy Studio SRL și pot fi șterse la cerere.',
+    },
+    {
+      question: 'Unde se află cabinetul în Sectorul 3? Există parcare?',
+      answer:
+        'Cabinetul este situat pe Bd. Theodor Pallady nr. 24, Sector 3, București — zona Pallady. Acces ușor cu metroul M2, stația Anghel Saligny (5 minute pe jos), tramvaiele 19, 27, 40 și autobuzul 246. Există parcare publică disponibilă pe Bd. Pallady și pe stradele secundare fără restricții.',
+    },
+    {
+      question: 'De câte ședințe am nevoie? Cât durează un proces terapeutic?',
+      answer:
+        'Durata variază în funcție de obiective și situație. Pentru anxietate sau depresie ușor-moderată, terapia cognitiv-comportamentală (CBT) dă de obicei rezultate vizibile în 8–16 ședințe. Burnout-ul sau problemele relaționale pot necesita 3–6 luni. Discutăm și stabilim un plan realist la prima ședință. Nu există un abonament obligatoriu — poți opri oricând.',
+    },
+    {
+      question: 'Oferiți și ședințe de psihoterapie online?',
+      answer:
+        'Da, oferim ședințe individuale online la 250 RON / 50 min, prin Zoom sau Google Meet. Calitatea și eficiența sunt comparabile cu ședințele față în față. Opțiunea online este ideală dacă locuiți în afara Sectorului 3 sau aveți un program dificil de deplasare. Programarea se face același sistem, cu date stocate pe servere EU.',
+    },
+    {
+      question: 'Ce este terapia cognitiv-comportamentală (CBT) și pentru ce ajută?',
+      answer:
+        'Terapia cognitiv-comportamentală (CBT) este una dintre cele mai studiate forme de psihoterapie, cu eficiență dovedită pentru anxietate, atacuri de panică, depresie, fobii, TOC și burnout. Lucrează cu legătura dintre gânduri, emoții și comportamente — identifici tiparele negative și le înlocuiești cu unele mai sănătoase. Este o terapie structurată, cu obiective clare și durată definită.',
+    },
+    {
+      question: 'Care este diferența dintre psiholog și psihoterapeut?',
+      answer:
+        'Psihologul are licență în psihologie și poate face evaluări, consiliere și psihoterapie (dacă are formare suplimentară). Psihoterapeutul are formare specializată în una sau mai multe metode terapeutice (CBT, psihanaliză, gestalt etc.) și este acreditat de Colegiul Psihologilor din România. Dr. Ana Ionescu este atât psiholog clinician specialist, cât și psihoterapeut acreditat CBT.',
     },
   ],
 
@@ -211,10 +236,39 @@ export const demoConfig: ClientConfig = {
   },
 
   seo: {
-    metaTitle: 'Psihoterapeut Sector 3 București | Dr. Ana Ionescu | Cabinet CBT',
+    metaTitle: 'Psihoterapeut Sector 3 București | Dr. Ana Ionescu | Cabinet CBT Pallady',
     metaDescription:
-      'Cabinet de psihoterapie cognitiv-comportamentală în Sectorul 3, București. Programări online disponibile. Ședință inițială gratuită. Acreditat Colegiul Psihologilor.',
-    keywords: ['psihoterapeut sector 3', 'psiholog bucuresti', 'terapie cbt bucuresti', 'cabinet psihologie titan'],
+      'Cabinet de psihoterapie cognitiv-comportamentală în zona Pallady, Sector 3, București. Lângă metrou Anghel Saligny. Programări online. Ședință inițială gratuită. Acreditat Colegiul Psihologilor din România.',
+    keywords: [
+      // Geo-locale primare
+      'psihoterapeut sector 3 bucuresti',
+      'psiholog pallady bucuresti',
+      'cabinet psihologie pallady sector 3',
+      'psihoterapeut titan sector 3',
+      'psiholog sector 3 langa metrou',
+      // Geo-locale secundare — zone adiacente
+      'psiholog republica bucuresti',
+      'cabinet psihoterapie dristor',
+      'psiholog vitan sector 3',
+      'psihoterapeut anghel saligny metrou',
+      'cabinet psihologie bd theodor pallady',
+      // Tip serviciu + locatie
+      'terapie cbt sector 3 bucuresti',
+      'terapie cognitiv comportamentala sector 3',
+      'sedinta psihologie sector 3 pret',
+      'terapie de cuplu sector 3 bucuresti',
+      'psiholog online sector 3 bucuresti',
+      // Problematici frecvente
+      'psiholog anxietate sector 3',
+      'psiholog depresie bucuresti sector 3',
+      'psiholog burnout bucuresti',
+      'psihoterapeut atacuri de panica sector 3',
+      // Long-tail
+      'cat costa o sedinta de psihologie sector 3',
+      'programare psiholog sector 3 online',
+      'psihoterapeut acreditat colegiul psihologilor sector 3',
+      'prima sedinta gratuita psiholog bucuresti',
+    ],
   },
 
   images: {

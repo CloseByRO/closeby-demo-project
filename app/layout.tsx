@@ -5,17 +5,18 @@ import { Header } from '@/components/layout/header'
 import { Footer } from '@/components/layout/footer'
 import { MobileBar } from '@/components/layout/mobile-bar'
 import { CookieBanner } from '@/components/ui/cookie-banner'
-import { SchemaLocalBusiness } from '@/components/seo/schema'
+import { SchemaLocalBusiness, SchemaPerson, SchemaWebSite } from '@/components/seo/schema'
 
 export const metadata: Metadata = {
   title: {
     default: clientConfig.seo.metaTitle,
-    template: `%s | ${clientConfig.shortName}`,
+    template: `%s | ${clientConfig.shortName} | Psihoterapeut Sector 3 București`,
   },
   description: clientConfig.seo.metaDescription,
   keywords: clientConfig.seo.keywords,
   metadataBase: new URL(clientConfig.website),
   alternates: { canonical: '/' },
+
   openGraph: {
     type: 'website',
     locale: 'ro_RO',
@@ -24,21 +25,42 @@ export const metadata: Metadata = {
     title: clientConfig.seo.metaTitle,
     description: clientConfig.seo.metaDescription,
   },
-  robots: { index: true, follow: true },
+
+  twitter: {
+    card: 'summary_large_image',
+    title: clientConfig.seo.metaTitle,
+    description: clientConfig.seo.metaDescription,
+  },
+
+  robots: {
+    index: true,
+    follow: true,
+    googleBot: { index: true, follow: true, 'max-snippet': -1, 'max-image-preview': 'large' },
+  },
+
+  // Geo meta tags — semnale locale puternice pentru Google
+  other: {
+    'geo.region': 'RO-B',
+    'geo.placename': `${clientConfig.address.sector}, ${clientConfig.address.city}`,
+    'geo.position': `${clientConfig.address.lat};${clientConfig.address.lng}`,
+    'ICBM': `${clientConfig.address.lat}, ${clientConfig.address.lng}`,
+  },
 }
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {
   return (
     <html lang="ro">
       <head>
-        {/* next/font is used in production — CSS fallback for local dev/build */}
         <link rel="preconnect" href="https://fonts.googleapis.com" />
         <link rel="preconnect" href="https://fonts.gstatic.com" crossOrigin="" />
         <link
           href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:ital,wght@0,400;0,500;0,600;1,400;1,500&family=DM+Sans:wght@300;400;500&display=swap"
           rel="stylesheet"
         />
+        {/* Schema.org sitewide */}
         <SchemaLocalBusiness config={clientConfig} />
+        <SchemaPerson config={clientConfig} />
+        <SchemaWebSite config={clientConfig} />
       </head>
       <body className="font-sans bg-cream text-ink antialiased">
         <Header config={clientConfig} />
