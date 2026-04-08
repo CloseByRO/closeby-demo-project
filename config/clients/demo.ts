@@ -46,10 +46,17 @@ export const demoConfig: ClientConfig = {
 
   integrations: {
     calComUsername: 'marian-potoroaca-o5t1s6',
-    calComEventSlugs: {
+    // Canonical slugs (used by automation across projects)
+    calComCanonicalEventSlugs: {
       initial: 'consultatie-initiala',
       session: 'sedinta-individuala',
       couple:  'terapie-cuplu',
+    },
+    // Demo/legacy override: this Cal account only has default event slugs.
+    calComEventSlugs: {
+      initial: '15min',
+      session: '30min',
+      couple:  '30min',
     },
     // TODO (pre-deploy): replace with real Place ID for this address.
     googlePlaceId: 'ChIJxxxxxxxxxxxxxxxxx',
@@ -273,7 +280,12 @@ export const demoConfig: ClientConfig = {
   },
 
   images: {
-    gallery: [],
+    therapist: '/clients/demo/therapist.jpg',
+    gallery: [
+      '/clients/demo/cabinet-1.jpg',
+      '/clients/demo/cabinet-2.jpg',
+      '/clients/demo/cabinet-3.jpg',
+    ],
   },
 
   gdpr: {

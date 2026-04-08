@@ -19,8 +19,10 @@ export function BookingSection({ config }: { config: ClientConfig }) {
   const [calVisible, setCalVisible] = useState(false)
   const calContainerRef = useRef<HTMLDivElement | null>(null)
 
-  const { calComUsername, calComEventSlugs, whatsappNumber, whatsappMessage } = config.integrations
-  const calLink = `${calComUsername}/${calComEventSlugs[selected]}`
+  const { calComUsername, calComCanonicalEventSlugs, calComEventSlugs, whatsappNumber, whatsappMessage } = config.integrations
+  // Canonical slugs are stable across projects for automation; override slugs are only for embedding on legacy/demo Cal accounts.
+  const embedSlugs = calComEventSlugs ?? calComCanonicalEventSlugs
+  const calLink = `${calComUsername}/${embedSlugs[selected]}`
   const waUrl = buildWhatsAppUrl(whatsappNumber ?? '', whatsappMessage)
   const bookingOptions = buildBookingOptions(config)
   const selectedOption = bookingOptions.find((o) => o.key === selected)

@@ -5,7 +5,7 @@ import { buildBookingOptions } from '../lib/booking-options.js'
 test('buildBookingOptions uses config.services durations/prices', () => {
   const config = {
     integrations: {
-      calComEventSlugs: {
+      calComCanonicalEventSlugs: {
         initial: 'consultatie-initiala',
         session: 'sedinta-individuala',
         couple: 'terapie-cuplu',

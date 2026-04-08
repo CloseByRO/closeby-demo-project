@@ -66,7 +66,20 @@ export interface ClientConfig {
 
   integrations: {
     calComUsername: string
-    calComEventSlugs: {
+    /**
+     * Canonical event slugs used across ALL client projects for automation.
+     * Your Cal.com account should be provisioned to match these slugs.
+     */
+    calComCanonicalEventSlugs: {
+      initial: string
+      session: string
+      couple: string
+    }
+    /**
+     * Optional per-client override for legacy/demo Cal.com accounts where event slugs differ.
+     * If provided, the embed will use these slugs, while UI/service mapping remains canonical.
+     */
+    calComEventSlugs?: {
       initial: string
       session: string
       couple: string
