@@ -28,6 +28,12 @@ export function BookingSection({ config }: { config: ClientConfig }) {
   const selectedOption = bookingOptions.find((o) => o.key === selected)
 
   useEffect(() => {
+    // When switching event types, Cal's embed iframe may not fully refresh from prop changes.
+    // We force a remount via `key` and reset the loading state.
+    setCalReady(false)
+  }, [calLink])
+
+  useEffect(() => {
     const el = calContainerRef.current
     if (!el) return
     const observer = new IntersectionObserver(
@@ -171,6 +177,7 @@ export function BookingSection({ config }: { config: ClientConfig }) {
               )}
               {calVisible && (
                 <CalEmbed
+                  key={calLink}
                   namespace={calLink}
                   calLink={calLink}
                   style={{ width: '100%', height: '100%', minHeight: '500px', overflow: 'scroll' }}
