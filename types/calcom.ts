@@ -1,5 +1,6 @@
 export type CalEventType =
   | 'BOOKING_CREATED'
+  | 'BOOKING_REQUESTED'
   | 'BOOKING_RESCHEDULED'
   | 'BOOKING_CANCELLED'
   | 'BOOKING_CONFIRMED'
@@ -9,6 +10,7 @@ export interface CalAttendee {
   email: string
   timeZone: string
   language: { locale: string }
+  phoneNumber?: string
 }
 
 export interface CalBookingData {
@@ -21,6 +23,10 @@ export interface CalBookingData {
   location?: string
   description?: string
   metadata?: Record<string, string>
+  responses?: {
+    attendeePhoneNumber?: string
+    [key: string]: unknown
+  }
 }
 
 export interface CalWebhookPayload {

@@ -3,6 +3,9 @@ import { verifyCalWebhookSignature, parseCalWebhookPayload, getReviewEmailDelay 
 import { sendConfirmationEmail, sendReminderEmail, sendReviewRequestEmail } from '@/lib/services/resend'
 import clientConfig from '@/config/client'
 import { buildPublicBaseUrl, qstashPublishJSON } from '@/lib/services/qstash'
+import { extractPhoneFromCalPayload } from '@/lib/antiAbuse/phone.js'
+import { redisSetIfNotExists } from '@/lib/services/upstashRedis'
+import { declineCalBookingByUid } from '@/lib/services/calApi'
 
 const WEBHOOK_SECRET = process.env.CAL_WEBHOOK_SECRET ?? ''
 
@@ -40,8 +43,54 @@ export async function POST(req: NextRequest) {
     }
     processed.add(idempotencyKey)
 
+    // Durable idempotency (recommended for serverless): only if Upstash is configured.
+    if (process.env.UPSTASH_REDIS_REST_URL && process.env.UPSTASH_REDIS_REST_TOKEN) {
+      const processedKey = `processed:webhook:${idempotencyKey}`
+      const firstTime = await redisSetIfNotExists({
+        key: processedKey,
+        value: { at: new Date().toISOString() },
+        ttlSeconds: 48 * 60 * 60,
+      })
+      if (!firstTime) {
+        return NextResponse.json({ ok: true, duplicate: true, durable: true })
+      }
+    }
+
     switch (triggerEvent) {
+      case 'BOOKING_REQUESTED':
       case 'BOOKING_CREATED':
+        // Phone lock (Phase 1): best-effort spam protection; requires Upstash + Cal API key.
+        const phone = extractPhoneFromCalPayload(payload)
+        if (phone && process.env.UPSTASH_REDIS_REST_URL && process.env.UPSTASH_REDIS_REST_TOKEN) {
+          const lockKey = `lock:phone:${phone}`
+          const acquired = await redisSetIfNotExists({
+            key: lockKey,
+            value: { uid: payload.uid, createdAt: new Date().toISOString() },
+            ttlSeconds: 24 * 60 * 60,
+          })
+
+          if (!acquired) {
+            try {
+              if (process.env.CAL_API_KEY) {
+                await declineCalBookingByUid({
+                  bookingUid: payload.uid,
+                  reason: 'Duplicate booking request (phone locked for 24h)',
+                })
+              } else {
+                console.warn('[cal-webhook] Duplicate phone lock but CAL_API_KEY missing; cannot auto-decline', {
+                  phone,
+                  uid: payload.uid,
+                })
+              }
+            } catch (e) {
+              console.error('[cal-webhook] Failed to auto-decline duplicate booking', e)
+            }
+
+            // Always ack; do not send emails / schedule jobs for duplicates.
+            return NextResponse.json({ ok: true, phoneLocked: true })
+          }
+        }
+
         await sendConfirmationEmail(payload)
         // Schedule 24h reminder using QStash (durable scheduling on Vercel)
         const reminderDelayMs = new Date(payload.startTime).getTime() - Date.now() - 24 * 3600 * 1000
