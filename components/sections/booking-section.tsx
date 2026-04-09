@@ -15,6 +15,7 @@ const CalEmbed = dynamic(async () => {
 
 const LOCAL_LOCK_KEY = 'closeby_booking_lock_until_v1'
 const LOCAL_LOCK_TTL_MS = 24 * 60 * 60 * 1000
+const LOCAL_LOCK_OVERRIDE_KEY = 'closeby_booking_lock_override_v1'
 
 function getLocalLockUntil(): number | null {
   try {
@@ -36,11 +37,29 @@ function setLocalLockUntil(untilMs: number) {
   }
 }
 
+function getLocalOverrideAllowed(): boolean {
+  try {
+    return window.localStorage.getItem(LOCAL_LOCK_OVERRIDE_KEY) === '1'
+  } catch {
+    return false
+  }
+}
+
+function setLocalOverrideAllowed(allowed: boolean) {
+  try {
+    if (allowed) window.localStorage.setItem(LOCAL_LOCK_OVERRIDE_KEY, '1')
+    else window.localStorage.removeItem(LOCAL_LOCK_OVERRIDE_KEY)
+  } catch {
+    // ignore
+  }
+}
+
 export function BookingSection({ config }: { config: ClientConfig }) {
   const [selected, setSelected] = useState<EventSlugKey>('initial')
   const [calReady, setCalReady] = useState(false)
   const [calVisible, setCalVisible] = useState(false)
   const [lockUntilMs, setLockUntilMs] = useState<number | null>(null)
+  const [overrideAllowed, setOverrideAllowed] = useState(false)
   const calContainerRef = useRef<HTMLDivElement | null>(null)
 
   const { calComUsername, calComCanonicalEventSlugs, calComEventSlugs, whatsappNumber, whatsappMessage } = config.integrations
@@ -50,7 +69,7 @@ export function BookingSection({ config }: { config: ClientConfig }) {
   const waUrl = buildWhatsAppUrl(whatsappNumber ?? '', whatsappMessage)
   const bookingOptions = buildBookingOptions(config)
   const selectedOption = bookingOptions.find((o) => o.key === selected)
-  const locallyLocked = lockUntilMs !== null && Date.now() < lockUntilMs
+  const locallyLocked = !overrideAllowed && lockUntilMs !== null && Date.now() < lockUntilMs
 
   useEffect(() => {
     // When switching event types, Cal's embed iframe may not fully refresh from prop changes.
@@ -60,6 +79,7 @@ export function BookingSection({ config }: { config: ClientConfig }) {
 
   useEffect(() => {
     setLockUntilMs(getLocalLockUntil())
+    setOverrideAllowed(getLocalOverrideAllowed())
   }, [])
 
   useEffect(() => {
@@ -105,6 +125,8 @@ export function BookingSection({ config }: { config: ClientConfig }) {
           const until = Date.now() + LOCAL_LOCK_TTL_MS
           setLocalLockUntil(until)
           setLockUntilMs(until)
+          setLocalOverrideAllowed(false)
+          setOverrideAllowed(false)
         },
       })
 
@@ -240,6 +262,21 @@ export function BookingSection({ config }: { config: ClientConfig }) {
                     <p className="text-xs mt-2 text-sage-d/80">
                       Dacă ai nevoie urgent, poți suna direct la {config.phoneDisplay} sau revino mai târziu.
                     </p>
+                    <div className="mt-4">
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setLocalOverrideAllowed(true)
+                          setOverrideAllowed(true)
+                        }}
+                        className="inline-flex items-center justify-center rounded-lg bg-sage-d px-4 py-2 text-sm font-medium text-white hover:bg-sage-d/90 transition-colors"
+                      >
+                        Programează pentru altcineva
+                      </button>
+                      <p className="mt-2 text-[11px] leading-snug text-sage-d/70">
+                        Dacă programezi pentru altă persoană, folosește numărul ei de telefon în formularul Cal.com.
+                      </p>
+                    </div>
                   </div>
                 </div>
               )}
