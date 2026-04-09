@@ -85,6 +85,11 @@ export async function POST(req: NextRequest) {
     const { triggerEvent, payload } = event
     const idempotencyKey = `${triggerEvent}:${payload.uid}`
 
+    const payloadAny = payload as unknown as {
+      responses?: { attendeePhoneNumber?: string }
+      attendees?: Array<{ phoneNumber?: string }>
+    }
+
     // #region agent log
     debugLog({
       sessionId: DEBUG_SESSION_ID,
@@ -96,8 +101,8 @@ export async function POST(req: NextRequest) {
           triggerEvent,
           hasUid: !!payload?.uid,
           uidSuffix: typeof payload?.uid === 'string' ? payload.uid.slice(-6) : null,
-          hasResponsesPhone: !!(payload as any)?.responses?.attendeePhoneNumber,
-          hasAttendeePhone: !!(payload as any)?.attendees?.[0]?.phoneNumber,
+          hasResponsesPhone: !!payloadAny.responses?.attendeePhoneNumber,
+          hasAttendeePhone: !!payloadAny.attendees?.[0]?.phoneNumber,
         },
         timestamp: Date.now(),
     })
