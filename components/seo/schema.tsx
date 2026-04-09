@@ -2,10 +2,21 @@ import type { ClientConfig } from '@/types/client-config'
 
 // ─── 1. LocalBusiness + MedicalBusiness — schema principal ───────────────────
 export function SchemaLocalBusiness({ config }: { config: ClientConfig }) {
+  const hasRealReviewLink =
+    !!config.integrations.reviewLink &&
+    !config.integrations.reviewLink.includes('XXXXX') &&
+    !config.integrations.reviewLink.includes('xxxx')
+
+  const hasRatings =
+    hasRealReviewLink &&
+    Number.isFinite(config.aggregateRating.reviewCount) &&
+    config.aggregateRating.reviewCount > 0 &&
+    !!config.aggregateRating.ratingValue
+
   const priceRange = config.services
     .filter((s) => s.price)
     .map((s) => `${s.price} ${s.currency}`)
-    .join(' – ')
+    .join(' - ')
 
   const schema = {
     '@context': 'https://schema.org',
@@ -23,7 +34,7 @@ export function SchemaLocalBusiness({ config }: { config: ClientConfig }) {
     url: config.website,
 
     // Specializare medicală (keep broad; Cal.com is source of booking data)
-    medicalSpecialty: 'Psychiatry',
+    medicalSpecialty: 'Psychology',
 
     // Contact
     telephone: config.phone,
@@ -96,29 +107,32 @@ export function SchemaLocalBusiness({ config }: { config: ClientConfig }) {
       { '@type': 'Language', name: 'Română' },
     ],
 
-    // Rating
-    aggregateRating: {
-      '@type': 'AggregateRating',
-      ratingValue: config.aggregateRating.ratingValue,
-      reviewCount: config.aggregateRating.reviewCount,
-      bestRating: '5',
-      worstRating: '1',
-    },
-
-    // Recenzii individuale
-    review: config.reviews.map((r) => ({
-      '@type': 'Review',
-      reviewRating: {
-        '@type': 'Rating',
-        ratingValue: r.rating,
-        bestRating: '5',
-      },
-      author: {
-        '@type': 'Person',
-        name: r.author,
-      },
-      reviewBody: r.text,
-    })),
+    ...(hasRatings
+      ? {
+          // Rating (only when a real Google review link is configured)
+          aggregateRating: {
+            '@type': 'AggregateRating',
+            ratingValue: config.aggregateRating.ratingValue,
+            reviewCount: config.aggregateRating.reviewCount,
+            bestRating: '5',
+            worstRating: '1',
+          },
+          // Recenzii individuale (optional; also gated behind real review link)
+          review: config.reviews.map((r) => ({
+            '@type': 'Review',
+            reviewRating: {
+              '@type': 'Rating',
+              ratingValue: r.rating,
+              bestRating: '5',
+            },
+            author: {
+              '@type': 'Person',
+              name: r.author,
+            },
+            reviewBody: r.text,
+          })),
+        }
+      : {}),
 
     // Catalog servicii
     hasOfferCatalog: {
@@ -137,7 +151,7 @@ export function SchemaLocalBusiness({ config }: { config: ClientConfig }) {
           '@type': 'MedicalTherapy',
           name: s.title,
           description: s.description,
-          relevantSpecialty: 'Psychiatry',
+          relevantSpecialty: 'Psychology',
         },
       })),
     },
@@ -157,6 +171,7 @@ export function SchemaLocalBusiness({ config }: { config: ClientConfig }) {
     // Same-as pentru profil extern (GBP va fi adăugat când e known)
     sameAs: [
       config.website,
+      ...(hasRealReviewLink ? [config.integrations.reviewLink] : []),
     ],
   }
 

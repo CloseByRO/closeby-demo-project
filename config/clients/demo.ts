@@ -25,8 +25,7 @@ export const demoConfig: ClientConfig = {
     postalCode: '032258',
     lat: 44.4135,
     lng: 26.1428,
-    mapsEmbedUrl:
-      'https://www.google.com/maps/embed?pb=!1m18!1m12!1m3!1d2849.1234!2d26.1428!3d44.4135!2m3!1f0!2f0!3f0!3m2!1i1024!2i768!4f13.1!3m3!1m2!1s0x0%3A0x0!2zNDTCsDI0JzQ4LjYiTiAyNsKwMDgnMzQuMSJF!5e0!3m2!1sro!2sro!4v1234567890',
+    mapsEmbedUrl: '',
     nearbyTransport: ['Metro M2 · Anghel Saligny (5 min)', 'Tramvai 19, 27, 40', 'Autobuz 246'],
     parking: 'Parcare publică disponibilă pe Bd. Pallady, stradă secundară fără restricții',
   },
@@ -58,11 +57,11 @@ export const demoConfig: ClientConfig = {
       session: '30min',
       couple:  '30min',
     },
-    // TODO (pre-deploy): replace with real Place ID for this address.
-    googlePlaceId: 'ChIJxxxxxxxxxxxxxxxxx',
+    // (pre-deploy): set to the real Google Place ID for this cabinet.
+    googlePlaceId: undefined,
     whatsappNumber: '40722000000',
     whatsappMessage: 'Bună ziua, doresc să fac o programare.',
-    reviewLink: 'https://g.page/r/XXXXX/review',
+    reviewLink: '',
   },
 
   content: {

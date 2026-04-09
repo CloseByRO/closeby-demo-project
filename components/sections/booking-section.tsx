@@ -59,6 +59,7 @@ export function BookingSection({ config }: { config: ClientConfig }) {
   const [calVisible, setCalVisible] = useState(false)
   const [lockUntilMs, setLockUntilMs] = useState<number | null>(null)
   const [overrideAllowed, setOverrideAllowed] = useState(false)
+  const [suppressLockOverlay, setSuppressLockOverlay] = useState(false)
   const calContainerRef = useRef<HTMLDivElement | null>(null)
 
   const { calComUsername, calComCanonicalEventSlugs, calComEventSlugs, whatsappNumber, whatsappMessage } = config.integrations
@@ -68,7 +69,10 @@ export function BookingSection({ config }: { config: ClientConfig }) {
   const waUrl = buildWhatsAppUrl(whatsappNumber ?? '', whatsappMessage)
   const bookingOptions = buildBookingOptions(config)
   const selectedOption = bookingOptions.find((o) => o.key === selected)
-  const locallyLocked = isLocallyLocked(Date.now(), lockUntilMs, overrideAllowed)
+  // UX nuance: after the *first* successful booking, we still store the 24h lock,
+  // but we don't immediately replace the embed with the "already requested" overlay.
+  // The overlay should show on a subsequent attempt (e.g., user returns/reloads).
+  const locallyLocked = !suppressLockOverlay && isLocallyLocked(Date.now(), lockUntilMs, overrideAllowed)
 
   useEffect(() => {
     // When switching event types, Cal's embed iframe may not fully refresh from prop changes.
@@ -126,6 +130,7 @@ export function BookingSection({ config }: { config: ClientConfig }) {
           setLockUntilMs(until)
           safeWriteOverrideAllowed(false)
           setOverrideAllowed(false)
+          setSuppressLockOverlay(true)
         },
       })
 
