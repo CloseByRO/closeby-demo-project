@@ -3,6 +3,7 @@ export type CalEventType =
   | 'BOOKING_REQUESTED'
   | 'BOOKING_RESCHEDULED'
   | 'BOOKING_CANCELLED'
+  | 'BOOKING_REJECTED'
   | 'BOOKING_CONFIRMED'
 
 export interface CalAttendee {

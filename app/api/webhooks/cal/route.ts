@@ -275,6 +275,10 @@ export async function POST(req: NextRequest) {
         // No review email for cancelled bookings
         break
 
+      case 'BOOKING_REJECTED':
+        // Booking was declined/rejected (often by our anti-abuse flow). Do nothing.
+        break
+
       case 'BOOKING_RESCHEDULED':
         await sendConfirmationEmail(payload)
         break
