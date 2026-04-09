@@ -32,6 +32,9 @@ function debugLog(payload: Record<string, unknown>) {
 export async function POST(req: NextRequest) {
   try {
     const debugProd = process.env.DEBUG_CAL_WEBHOOK === '1'
+    const hasRedis =
+      (!!process.env.KV_REST_API_URL && !!process.env.KV_REST_API_TOKEN) ||
+      (!!process.env.UPSTASH_REDIS_REST_URL && !!process.env.UPSTASH_REDIS_REST_TOKEN)
 
     // #region agent log
     debugLog({
@@ -42,8 +45,7 @@ export async function POST(req: NextRequest) {
         message: 'cal-webhook hit',
         data: {
           hasWebhookSecret: !!WEBHOOK_SECRET,
-          hasUpstashUrl: !!process.env.UPSTASH_REDIS_REST_URL,
-          hasUpstashToken: !!process.env.UPSTASH_REDIS_REST_TOKEN,
+          hasRedis,
           hasCalApiKey: !!process.env.CAL_API_KEY,
         },
         timestamp: Date.now(),
@@ -105,7 +107,7 @@ export async function POST(req: NextRequest) {
         uidSuffix: typeof payload?.uid === 'string' ? payload.uid.slice(-6) : null,
         hasResponsesPhone: !!payloadAny.responses?.attendeePhoneNumber,
         hasAttendeePhone: !!payloadAny.attendees?.[0]?.phoneNumber,
-        hasUpstash: !!process.env.UPSTASH_REDIS_REST_URL && !!process.env.UPSTASH_REDIS_REST_TOKEN,
+        hasRedis,
         hasCalApiKey: !!process.env.CAL_API_KEY,
       })
     }
@@ -134,8 +136,8 @@ export async function POST(req: NextRequest) {
     }
     processed.add(idempotencyKey)
 
-    // Durable idempotency (recommended for serverless): only if Upstash is configured.
-    if (process.env.UPSTASH_REDIS_REST_URL && process.env.UPSTASH_REDIS_REST_TOKEN) {
+    // Durable idempotency (recommended for serverless): only if Redis is configured.
+    if (hasRedis) {
       const processedKey = `processed:webhook:${idempotencyKey}`
       try {
         const firstTime = await redisSetIfNotExists({
@@ -195,7 +197,7 @@ export async function POST(req: NextRequest) {
             timestamp: Date.now(),
         })
         // #endregion agent log
-        if (phone && process.env.UPSTASH_REDIS_REST_URL && process.env.UPSTASH_REDIS_REST_TOKEN) {
+        if (phone && hasRedis) {
           const lockKey = `lock:phone:${phone}`
           let acquired: boolean | null = null
           try {

@@ -5,6 +5,14 @@ import type { ClientConfig } from '@/types/client-config'
 import { buildWhatsAppUrl } from '@/lib/utils'
 import { cn } from '@/lib/utils'
 import { buildBookingOptions } from '@/lib/booking-options'
+import {
+  LOCAL_BOOKING_LOCK_TTL_MS,
+  readLockUntil,
+  readOverrideAllowed,
+  writeLockUntil,
+  writeOverrideAllowed,
+  isLocallyLocked,
+} from '@/lib/antiAbuse/localBookingLock'
 
 type EventSlugKey = 'initial' | 'session' | 'couple'
 
@@ -13,42 +21,33 @@ const CalEmbed = dynamic(async () => {
   return mod.default
 }, { ssr: false })
 
-const LOCAL_LOCK_KEY = 'closeby_booking_lock_until_v1'
-const LOCAL_LOCK_TTL_MS = 24 * 60 * 60 * 1000
-const LOCAL_LOCK_OVERRIDE_KEY = 'closeby_booking_lock_override_v1'
-
-function getLocalLockUntil(): number | null {
+function safeReadLockUntil(): number | null {
   try {
-    const raw = window.localStorage.getItem(LOCAL_LOCK_KEY)
-    if (!raw) return null
-    const n = Number(raw)
-    if (!Number.isFinite(n)) return null
-    return n
+    return readLockUntil(window.localStorage)
   } catch {
     return null
   }
 }
 
-function setLocalLockUntil(untilMs: number) {
+function safeWriteLockUntil(untilMs: number) {
   try {
-    window.localStorage.setItem(LOCAL_LOCK_KEY, String(untilMs))
+    writeLockUntil(window.localStorage, untilMs)
   } catch {
     // ignore
   }
 }
 
-function getLocalOverrideAllowed(): boolean {
+function safeReadOverrideAllowed(): boolean {
   try {
-    return window.localStorage.getItem(LOCAL_LOCK_OVERRIDE_KEY) === '1'
+    return readOverrideAllowed(window.localStorage)
   } catch {
     return false
   }
 }
 
-function setLocalOverrideAllowed(allowed: boolean) {
+function safeWriteOverrideAllowed(allowed: boolean) {
   try {
-    if (allowed) window.localStorage.setItem(LOCAL_LOCK_OVERRIDE_KEY, '1')
-    else window.localStorage.removeItem(LOCAL_LOCK_OVERRIDE_KEY)
+    writeOverrideAllowed(window.localStorage, allowed)
   } catch {
     // ignore
   }
@@ -69,7 +68,7 @@ export function BookingSection({ config }: { config: ClientConfig }) {
   const waUrl = buildWhatsAppUrl(whatsappNumber ?? '', whatsappMessage)
   const bookingOptions = buildBookingOptions(config)
   const selectedOption = bookingOptions.find((o) => o.key === selected)
-  const locallyLocked = !overrideAllowed && lockUntilMs !== null && Date.now() < lockUntilMs
+  const locallyLocked = isLocallyLocked(Date.now(), lockUntilMs, overrideAllowed)
 
   useEffect(() => {
     // When switching event types, Cal's embed iframe may not fully refresh from prop changes.
@@ -78,8 +77,8 @@ export function BookingSection({ config }: { config: ClientConfig }) {
   }, [calLink])
 
   useEffect(() => {
-    setLockUntilMs(getLocalLockUntil())
-    setOverrideAllowed(getLocalOverrideAllowed())
+    setLockUntilMs(safeReadLockUntil())
+    setOverrideAllowed(safeReadOverrideAllowed())
   }, [])
 
   useEffect(() => {
@@ -122,10 +121,10 @@ export function BookingSection({ config }: { config: ClientConfig }) {
       cal('on', {
         action: 'bookingSuccessfulV2',
         callback: () => {
-          const until = Date.now() + LOCAL_LOCK_TTL_MS
-          setLocalLockUntil(until)
+          const until = Date.now() + LOCAL_BOOKING_LOCK_TTL_MS
+          safeWriteLockUntil(until)
           setLockUntilMs(until)
-          setLocalOverrideAllowed(false)
+          safeWriteOverrideAllowed(false)
           setOverrideAllowed(false)
         },
       })
@@ -266,7 +265,7 @@ export function BookingSection({ config }: { config: ClientConfig }) {
                       <button
                         type="button"
                         onClick={() => {
-                          setLocalOverrideAllowed(true)
+                          safeWriteOverrideAllowed(true)
                           setOverrideAllowed(true)
                         }}
                         className="inline-flex items-center justify-center rounded-lg bg-sage-d px-4 py-2 text-sm font-medium text-white hover:bg-sage-d/90 transition-colors"

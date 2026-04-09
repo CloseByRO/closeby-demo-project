@@ -15,8 +15,12 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: 'Invalid phone' }, { status: 400 })
     }
 
-    // If Upstash isn't configured, fail open (Phase 1).
-    if (!process.env.UPSTASH_REDIS_REST_URL || !process.env.UPSTASH_REDIS_REST_TOKEN) {
+    const hasRedis =
+      (!!process.env.KV_REST_API_URL && !!process.env.KV_REST_API_TOKEN) ||
+      (!!process.env.UPSTASH_REDIS_REST_URL && !!process.env.UPSTASH_REDIS_REST_TOKEN)
+
+    // If Redis isn't configured, fail open (Phase 1).
+    if (!hasRedis) {
       return NextResponse.json({ locked: false, reason: 'no_store' })
     }
 
