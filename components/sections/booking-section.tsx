@@ -17,6 +17,11 @@ export function BookingSection({ config }: { config: ClientConfig }) {
   const [selected, setSelected] = useState<EventSlugKey>('initial')
   const [calReady, setCalReady] = useState(false)
   const [calVisible, setCalVisible] = useState(false)
+  const [phone, setPhone] = useState('')
+  const [phoneChecked, setPhoneChecked] = useState(false)
+  const [phoneLocked, setPhoneLocked] = useState(false)
+  const [checkingPhone, setCheckingPhone] = useState(false)
+  const [phoneError, setPhoneError] = useState<string | null>(null)
   const calContainerRef = useRef<HTMLDivElement | null>(null)
 
   const { calComUsername, calComCanonicalEventSlugs, calComEventSlugs, whatsappNumber, whatsappMessage } = config.integrations
@@ -51,6 +56,7 @@ export function BookingSection({ config }: { config: ClientConfig }) {
 
   useEffect(() => {
     if (!calVisible) return
+    if (!phoneChecked || phoneLocked) return
     let cancelled = false
     ;(async () => {
       const mod = await import('@calcom/embed-react')
@@ -68,7 +74,38 @@ export function BookingSection({ config }: { config: ClientConfig }) {
       setCalReady(true)
     })()
     return () => { cancelled = true }
-  }, [calLink, calVisible])
+  }, [calLink, calVisible, phoneChecked, phoneLocked])
+
+  async function checkPhoneLock() {
+    setCheckingPhone(true)
+    setPhoneError(null)
+    try {
+      const res = await fetch('/api/anti-abuse/phone-lock', {
+        method: 'POST',
+        headers: { 'content-type': 'application/json' },
+        body: JSON.stringify({ phone }),
+      })
+      const data = await res.json().catch(() => ({}))
+      if (!res.ok) {
+        setPhoneChecked(false)
+        setPhoneLocked(false)
+        setPhoneError(data?.error ?? 'Număr invalid')
+        return
+      }
+      const locked = !!data?.locked
+      setPhoneChecked(true)
+      setPhoneLocked(locked)
+      if (locked) {
+        setPhoneError('Ai deja o cerere de programare în ultimele 24h. Te rugăm să aștepți confirmarea.')
+      }
+    } catch {
+      setPhoneChecked(false)
+      setPhoneLocked(false)
+      setPhoneError('Nu am putut verifica numărul. Încearcă din nou.')
+    } finally {
+      setCheckingPhone(false)
+    }
+  }
 
   return (
     <section id="programare" className="py-24 px-6 lg:px-10 bg-ink">
@@ -163,6 +200,48 @@ export function BookingSection({ config }: { config: ClientConfig }) {
               </p>
             </div>
 
+            {/* Phone gate */}
+            <div className="px-6 pt-5 pb-4 border-b border-sage-l/30 bg-white">
+              <div className="flex flex-col sm:flex-row gap-3 sm:items-end">
+                <label className="flex-1">
+                  <span className="block text-xs font-medium text-ink mb-1">Număr de telefon</span>
+                  <input
+                    value={phone}
+                    onChange={(e) => {
+                      setPhone(e.target.value)
+                      setPhoneChecked(false)
+                      setPhoneLocked(false)
+                      setPhoneError(null)
+                    }}
+                    placeholder="+40 7xx xxx xxx"
+                    inputMode="tel"
+                    className="w-full rounded-lg border border-sage-l/50 px-3 py-2 text-sm text-ink outline-none focus:ring-2 focus:ring-sage-d/30"
+                  />
+                </label>
+                <button
+                  type="button"
+                  onClick={checkPhoneLock}
+                  disabled={checkingPhone || phone.trim().length < 6}
+                  className={cn(
+                    'rounded-lg px-4 py-2 text-sm font-medium transition-colors',
+                    checkingPhone || phone.trim().length < 6
+                      ? 'bg-ink/10 text-ink/40 cursor-not-allowed'
+                      : 'bg-sage-d text-white hover:bg-sage-d/90'
+                  )}
+                >
+                  {checkingPhone ? 'Verific...' : 'Continuă'}
+                </button>
+              </div>
+              {phoneError && (
+                <p className="mt-2 text-xs text-red-700">{phoneError}</p>
+              )}
+              {!phoneError && phoneChecked && !phoneLocked && (
+                <p className="mt-2 text-xs text-ink/60">
+                  Cererile duplicate (același număr) în 24h sunt respinse automat.
+                </p>
+              )}
+            </div>
+
             {/* Cal.com embed */}
             <div ref={calContainerRef} className="relative min-h-[500px]">
               {(!calVisible || !calReady) && (
@@ -175,7 +254,7 @@ export function BookingSection({ config }: { config: ClientConfig }) {
                   </div>
                 </div>
               )}
-              {calVisible && (
+              {calVisible && phoneChecked && !phoneLocked && (
                 <CalEmbed
                   key={calLink}
                   namespace={calLink}
@@ -186,6 +265,19 @@ export function BookingSection({ config }: { config: ClientConfig }) {
                     theme: 'light',
                   }}
                 />
+              )}
+              {calVisible && (!phoneChecked || phoneLocked) && (
+                <div className="absolute inset-0 flex items-center justify-center bg-sage-xl">
+                  <div className="text-center text-sage-d max-w-md px-6">
+                    <div className="text-3xl mb-3">🔒</div>
+                    <p className="text-sm font-medium">
+                      {!phoneChecked ? 'Introdu numărul de telefon pentru a continua' : 'Programările sunt blocate pentru acest număr'}
+                    </p>
+                    <p className="text-xs mt-2 text-sage-d/80">
+                      Dacă ai nevoie urgent, poți suna direct la {config.phoneDisplay}.
+                    </p>
+                  </div>
+                </div>
               )}
             </div>
 
