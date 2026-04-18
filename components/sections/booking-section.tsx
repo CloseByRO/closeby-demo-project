@@ -13,6 +13,7 @@ import {
   writeOverrideAllowed,
   isLocallyLocked,
 } from '@/lib/antiAbuse/localBookingLock'
+import { useMergedClientConfig } from '@/components/providers/client-config-provider'
 
 type EventSlugKey = 'initial' | 'session' | 'couple'
 
@@ -54,6 +55,8 @@ function safeWriteOverrideAllowed(allowed: boolean) {
 }
 
 export function BookingSection({ config }: { config: ClientConfig }) {
+  const merged = useMergedClientConfig()
+  const effectiveConfig = merged ?? config
   const [selected, setSelected] = useState<EventSlugKey>('initial')
   const [calReady, setCalReady] = useState(false)
   const [calVisible, setCalVisible] = useState(false)
@@ -62,12 +65,13 @@ export function BookingSection({ config }: { config: ClientConfig }) {
   const [suppressLockOverlay, setSuppressLockOverlay] = useState(false)
   const calContainerRef = useRef<HTMLDivElement | null>(null)
 
-  const { calComUsername, calComCanonicalEventSlugs, calComEventSlugs, whatsappNumber, whatsappMessage } = config.integrations
+  const { calComUsername, calComCanonicalEventSlugs, calComEventSlugs, whatsappNumber, whatsappMessage } =
+    effectiveConfig.integrations
   // Canonical slugs are stable across projects for automation; override slugs are only for embedding on legacy/demo Cal accounts.
   const embedSlugs = calComEventSlugs ?? calComCanonicalEventSlugs
   const calLink = `${calComUsername}/${embedSlugs[selected]}`
   const waUrl = buildWhatsAppUrl(whatsappNumber ?? '', whatsappMessage)
-  const bookingOptions = buildBookingOptions(config)
+  const bookingOptions = buildBookingOptions(effectiveConfig)
   const selectedOption = bookingOptions.find((o) => o.key === selected)
   // UX nuance: after the *first* successful booking, we still store the 24h lock,
   // but we don't immediately replace the embed with the "already requested" overlay.
@@ -192,13 +196,13 @@ export function BookingSection({ config }: { config: ClientConfig }) {
             <div className="space-y-3">
               <p className="text-xs text-white/30 uppercase tracking-wider mb-3">Sau contactează direct</p>
               <a
-                href={`tel:${config.phone}`}
+                href={`tel:${effectiveConfig.phone}`}
                 className="flex items-center gap-3 bg-white/5 border border-white/10 rounded-xl px-5 py-3.5 hover:bg-white/10 transition-colors"
               >
                 <div className="w-10 h-10 rounded-lg bg-sage-d/60 flex items-center justify-content:center justify-center text-lg flex-shrink-0">📞</div>
                 <div>
-                  <div className="text-sm font-medium text-white">{config.phoneDisplay}</div>
-                  <div className="text-xs text-white/40">{config.openingHoursDisplay}</div>
+                  <div className="text-sm font-medium text-white">{effectiveConfig.phoneDisplay}</div>
+                  <div className="text-xs text-white/40">{effectiveConfig.openingHoursDisplay}</div>
                 </div>
               </a>
               {whatsappNumber && (
@@ -225,7 +229,7 @@ export function BookingSection({ config }: { config: ClientConfig }) {
                 {selectedOption?.label}
               </h3>
               <p className="text-sm text-ink-l mt-1">
-                {selectedOption?.note} · {config.address.sector} sau online
+                {selectedOption?.note} · {effectiveConfig.address.sector} sau online
               </p>
               <p className="text-xs text-ink-xl mt-2">
                 Durata exactă este setată în Cal.com.
@@ -264,7 +268,7 @@ export function BookingSection({ config }: { config: ClientConfig }) {
                       Ai trimis deja o cerere de programare în ultimele 24h
                     </p>
                     <p className="text-xs mt-2 text-sage-d/80">
-                      Dacă ai nevoie urgent, poți suna direct la {config.phoneDisplay} sau revino mai târziu.
+                      Dacă ai nevoie urgent, poți suna direct la {effectiveConfig.phoneDisplay} sau revino mai târziu.
                     </p>
                     <div className="mt-4">
                       <button
@@ -289,8 +293,8 @@ export function BookingSection({ config }: { config: ClientConfig }) {
             <div className="px-6 py-4 bg-sage-l/40 border-t border-sage-l/30 flex items-center gap-2">
               <span className="text-xs text-sage-d">🔒</span>
               <span className="text-xs text-sage-d/80">
-                Date stocate pe servere în {config.gdpr.serverLocation} · GDPR compliant ·{' '}
-                {config.gdpr.dataProcessorName}
+                Date stocate pe servere în {effectiveConfig.gdpr.serverLocation} · GDPR compliant ·{' '}
+                {effectiveConfig.gdpr.dataProcessorName}
               </span>
             </div>
           </div>
