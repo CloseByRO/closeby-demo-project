@@ -1,6 +1,8 @@
 import { NextResponse, type NextRequest } from 'next/server'
 import { seoPlatformRequest } from '@/lib/services/seoPlatform.js'
 
+const CLIENT_SLUG = String(process.env.CLIENT_SLUG ?? '').trim()
+
 export async function POST(req: NextRequest) {
   try {
     const body = await req.json().catch(() => null)
@@ -14,7 +16,7 @@ export async function POST(req: NextRequest) {
     }
     const response = await seoPlatformRequest('/api/internal/firebase/phone-lock', {
       method: 'POST',
-      body: JSON.stringify({ phone: phoneRaw, idToken }),
+      body: JSON.stringify({ phone: phoneRaw, idToken, clientSlug: CLIENT_SLUG }),
     })
     const data = await response.json().catch(() => null)
     if (!response.ok) {

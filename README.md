@@ -127,7 +127,7 @@ vercel --prod
 Pentru a evita leakage de secrete și a pregăti modelul multi-client:
 
 - **`config/clients/[slug].ts`**: doar conținut public/business (texte, servicii, SEO, UI).
-- **Env vars**: credențiale shared ale aplicației (`RESEND_API_KEY`, `QSTASH_TOKEN`, `KV_REST_API_TOKEN`, `SUPABASE_SERVICE_ROLE_KEY`, etc.).
+- **Env vars**: credențiale shared ale aplicației (`RESEND_API_KEY`, `KV_REST_API_TOKEN`, `SUPABASE_SERVICE_ROLE_KEY`, etc.).
 - **Env vars publice per client/deployment**: valori Cal.com folosite în embed (`NEXT_PUBLIC_CAL_COM_*`).
 - **Tenant DB (Supabase) pentru scalare**: Cal.com per client (username/slugs + secrete) ca source-of-truth pentru onboarding multi-client.
 
@@ -146,7 +146,7 @@ Pentru a evita leakage de secrete și a pregăti modelul multi-client:
 
 ### Rotație secrete + scanning
 
-- Rotește `CAL_*`, `RESEND_*`, `QSTASH_*`, Redis și **service role** Supabase la incident sau la churn client.
+- Rotește `CAL_*`, `RESEND_*`, Redis și **service role** Supabase la incident sau la churn client.
 - Rulează local [Gitleaks](https://github.com/gitleaks/gitleaks) sau [TruffleHog](https://github.com/trufflesecurity/trufflehog) înainte de push dacă adaugi integrări noi; CI rulează `tsc` / lint / test (vezi `.github/workflows/ci.yml`).
 
 ### Paritate cu `seo-data-platform` (build-uri website)
@@ -239,7 +239,7 @@ Nu necesită billing activat. Generezi URL-ul de embed din Google Maps:
 
 ## Known constraints (important înainte de producție)
 
-- **Serverless timers**: `setTimeout()` în `app/api/webhooks/cal/route.ts` nu e fiabil pe Vercel (funcțiile pot fi oprite/restartate). Pentru clienți reali folosești **queue/job scheduling** (ex. QStash) pentru reminder + review request.
+- **Serverless timers**: `setTimeout()` în `app/api/webhooks/cal/route.ts` nu e fiabil pe Vercel (funcțiile pot fi oprite/restartate). Pentru clienți reali vei avea nevoie de un mecanism fiabil de scheduling.
 
 ## Testing / TDD workflow
 
@@ -280,14 +280,11 @@ Rulezi checklist-ul ăsta înainte de “final beta build” pe fiecare client.
 - [ ] `NEXT_PUBLIC_CAL_COM_CANONICAL_EVENT_SLUGS_JSON` valid JSON cu cheile `initial/session/couple`
 - [ ] `CAL_WEBHOOK_SECRET` corespunde webhook-ului din Cal.com
 - [ ] `RESEND_API_KEY` set + domeniu verificat în Resend (SPF/DKIM/DMARC)
-- [ ] (Prod) `QSTASH_TOKEN` + `QSTASH_FORWARD_SECRET` set pentru scheduling fiabil
 
 ### Cal.com (EU) end-to-end
 
 - [ ] Creezi programare reală în Cal.com → confirmi că webhook-ul ajunge la `/api/webhooks/cal` (200 OK)
 - [ ] Email “confirmare programare” ajunge la attendee
-- [ ] (Prod cu QStash) verifici că se programează job-urile pentru reminder + review request
-- [ ] Job routes (`/api/jobs/send-reminder`, `/api/jobs/send-review-request`) resping cereri fără `Authorization` când `QSTASH_FORWARD_SECRET` e set
 
 ### Resend deliverability
 

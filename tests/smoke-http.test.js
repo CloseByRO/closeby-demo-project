@@ -118,38 +118,3 @@ test('smoke: cal webhook accepts valid signature (when CAL_WEBHOOK_SECRET is set
   assert.notEqual(res.status, 401)
 })
 
-test('smoke: qstash job routes reject unauthorized (when QSTASH_FORWARD_SECRET is set)', { skip: !BASE_URL || !process.env.QSTASH_FORWARD_SECRET }, async () => {
-  const payload = {
-    uid: 'demo_uid',
-    title: 'Demo',
-    startTime: new Date(Date.now() + 3600_000).toISOString(),
-    endTime: new Date(Date.now() + 5400_000).toISOString(),
-    attendees: [{ name: 'Ion Popescu', email: 'ion.popescu@example.com', timeZone: 'Europe/Bucharest', language: { locale: 'ro' } }],
-    organizer: { name: 'Org', email: 'org@example.com', timeZone: 'Europe/Bucharest' },
-  }
-
-  const strict = process.env.SMOKE_STRICT_QSTASH_AUTH === '1'
-
-  const r1 = await fetch(url('/api/jobs/send-reminder'), {
-    method: 'POST',
-    headers: { 'content-type': 'application/json' },
-    body: JSON.stringify(payload),
-  })
-  if (strict) {
-    assert.equal(r1.status, 401)
-  } else {
-    assert.ok(r1.status === 401 || r1.status === 200)
-  }
-
-  const r2 = await fetch(url('/api/jobs/send-review-request'), {
-    method: 'POST',
-    headers: { 'content-type': 'application/json' },
-    body: JSON.stringify(payload),
-  })
-  if (strict) {
-    assert.equal(r2.status, 401)
-  } else {
-    assert.ok(r2.status === 401 || r2.status === 200)
-  }
-})
-

@@ -6,6 +6,7 @@ import { seoPlatformRequest } from '@/lib/services/seoPlatform.js'
 const BOOKING_SESSION_COOKIE = 'booking_verify_session'
 const BOOKING_SESSION_MAX_AGE_SECONDS = 2 * 60 * 60
 const BOOKING_SESSION_HMAC_HEX_RE = /^[0-9a-f]{64}$/i
+const CLIENT_SLUG = String(process.env.CLIENT_SLUG ?? '').trim()
 
 function getBookingSessionSecret(): string {
   return String(process.env.BOOKING_VERIFY_SESSION_SECRET ?? process.env.CAL_WEBHOOK_SECRET ?? '').trim()
@@ -41,16 +42,31 @@ function verifyBookingSessionValue(rawValue: string, secret: string): { valid: b
 }
 
 export async function GET() {
-  const secret = getBookingSessionSecret()
-  if (!secret) return NextResponse.json({ verified: false }, { status: 200 })
+  try {
+    const secret = getBookingSessionSecret()
+    if (!secret) return NextResponse.json({ verified: false }, { status: 200 })
 
-  const cookieStore = await cookies()
-  const value = cookieStore.get(BOOKING_SESSION_COOKIE)?.value
-  if (!value) return NextResponse.json({ verified: false }, { status: 200 })
+    const cookieStore = await cookies()
+    const value = cookieStore.get(BOOKING_SESSION_COOKIE)?.value
+    if (!value) return NextResponse.json({ verified: false }, { status: 200 })
 
-  const result = verifyBookingSessionValue(value, secret)
-  if (!result.valid) return NextResponse.json({ verified: false }, { status: 200 })
-  return NextResponse.json({ verified: true, phone: result.phone }, { status: 200 })
+    const result = verifyBookingSessionValue(value, secret)
+    if (!result.valid) return NextResponse.json({ verified: false }, { status: 200 })
+    if (result.phone) {
+      const lockResponse = await seoPlatformRequest('/api/internal/firebase/phone-lock-status', {
+        method: 'POST',
+        body: JSON.stringify({ phone: result.phone, clientSlug: CLIENT_SLUG }),
+      })
+      const lockData = (await lockResponse.json().catch(() => null)) as { locked?: boolean; createdAt?: string; phone?: string } | null
+      if (lockResponse.ok && lockData?.locked) {
+        return NextResponse.json({ verified: false, locked: true, createdAt: lockData.createdAt, phone: lockData.phone ?? result.phone }, { status: 200 })
+      }
+    }
+
+    return NextResponse.json({ verified: true, phone: result.phone }, { status: 200 })
+  } catch {
+    return NextResponse.json({ verified: false }, { status: 200 })
+  }
 }
 
 export async function POST(req: NextRequest) {
@@ -62,6 +78,15 @@ export async function POST(req: NextRequest) {
     if (!idToken) return NextResponse.json({ error: 'Missing idToken' }, { status: 400 })
     if (!phoneRaw) return NextResponse.json({ error: 'Missing phone' }, { status: 400 })
 
+    const lockResponse = await seoPlatformRequest('/api/internal/firebase/phone-lock-status', {
+      method: 'POST',
+      body: JSON.stringify({ phone: phoneRaw, clientSlug: CLIENT_SLUG }),
+    })
+    const lockData = (await lockResponse.json().catch(() => null)) as { locked?: boolean; createdAt?: string } | null
+    if (lockResponse.ok && lockData?.locked) {
+      return NextResponse.json({ locked: true, createdAt: lockData.createdAt }, { status: 200 })
+    }
+
     const response = await seoPlatformRequest('/api/internal/firebase/verify-phone', {
       method: 'POST',
       body: JSON.stringify({ idToken, phone: phoneRaw }),
@@ -69,12 +94,12 @@ export async function POST(req: NextRequest) {
     const data = await response.json().catch(() => null)
     if (!response.ok) {
       return NextResponse.json(
-        { verified: false, error: data?.error ?? 'Verification failed' },
+        { verified: false, locked: false, error: data?.error ?? 'Verification failed' },
         { status: response.status },
       )
     }
 
-    const responsePayload = { verified: true, phone: data?.phone ?? phoneRaw }
+    const responsePayload = { verified: true, locked: false, phone: data?.phone ?? phoneRaw }
     const responseOut = NextResponse.json(responsePayload)
     const secret = getBookingSessionSecret()
     if (secret) {

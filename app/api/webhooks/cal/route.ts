@@ -3,11 +3,8 @@ import { cookies } from 'next/headers'
 import { createHmac, timingSafeEqual } from 'crypto'
 import { verifyCalWebhookSignature, parseCalWebhookPayload, getReviewEmailDelay } from '@/lib/services/calcom'
 import { sendConfirmationEmail, sendReminderEmail, sendReviewRequestEmail } from '@/lib/services/resend'
-import clientConfig from '@/config/client'
-import { buildPublicBaseUrl, qstashPublishJSON } from '@/lib/services/qstash'
 import { extractPhoneFromCalPayload } from '@/lib/antiAbuse/phone.js'
-import { redisSetIfNotExists } from '@/lib/services/upstashRedis'
-import { declineCalBookingByUid } from '@/lib/services/calApi'
+import { seoPlatformRequest } from '@/lib/services/seoPlatform.js'
 import { resolveActiveTenantCalSecrets } from '@/lib/integrations/resolveCalSecrets'
 
 // Simple in-memory idempotency (use Redis/KV in production)
@@ -34,6 +31,8 @@ const CAL_SESSION_COOKIE = 'cal_session'
 const CAL_SESSION_MAX_AGE = 7200
 const HMAC_SHA256_HEX_LEN = 64
 const HMAC_SHA256_HEX_RE = new RegExp(`^[0-9a-f]{${HMAC_SHA256_HEX_LEN}}$`, 'i')
+const hasResend = Boolean(process.env.RESEND_API_KEY)
+const CLIENT_SLUG = String(process.env.CLIENT_SLUG ?? '').trim()
 
 function signCalSessionToken(bookingUid: string): string | null {
   const secret = process.env.CAL_WEBHOOK_SECRET
@@ -86,9 +85,7 @@ export async function POST(req: NextRequest) {
       await resolveActiveTenantCalSecrets(body)
 
     const debugProd = process.env.DEBUG_CAL_WEBHOOK === '1'
-    const hasRedis =
-      (!!process.env.KV_REST_API_URL && !!process.env.KV_REST_API_TOKEN) ||
-      (!!process.env.UPSTASH_REDIS_REST_URL && !!process.env.UPSTASH_REDIS_REST_TOKEN)
+    const hasSeoBridge = !!process.env.SEO_DATA_PLATFORM_URL
 
     // #region agent log
     debugLog({
@@ -99,7 +96,7 @@ export async function POST(req: NextRequest) {
       message: 'cal-webhook hit',
       data: {
         hasWebhookSecret: !!webhookSecret,
-        hasRedis,
+        hasSeoBridge,
         hasCalApiKey: !!calApiKey,
         tenantSource,
         resolvedClientSlug,
@@ -150,7 +147,7 @@ export async function POST(req: NextRequest) {
         uidSuffix: typeof payload?.uid === 'string' ? payload.uid.slice(-6) : null,
         hasResponsesPhone: !!payloadAny.responses?.attendeePhoneNumber,
         hasAttendeePhone: !!payloadAny.attendees?.[0]?.phoneNumber,
-        hasRedis,
+        hasSeoBridge,
         hasCalApiKey: !!calApiKey,
       })
     }
@@ -179,140 +176,32 @@ export async function POST(req: NextRequest) {
     }
     processed.add(idempotencyKey)
 
-    // Durable idempotency (recommended for serverless): only if Redis is configured.
-    if (hasRedis) {
-      const processedKey = `processed:webhook:${idempotencyKey}`
-      try {
-        const firstTime = await redisSetIfNotExists({
-          key: processedKey,
-          value: { at: new Date().toISOString() },
-          ttlSeconds: 48 * 60 * 60,
-        })
-        if (debugProd) console.log('[cal-webhook][dbg] durable-idempotency', { firstTime })
-        // #region agent log
-        debugLog({
-          sessionId: DEBUG_SESSION_ID,
-            runId: 'pre-fix',
-            hypothesisId: 'H_idempotency',
-            location: 'app/api/webhooks/cal/route.ts:POST:durable-idempotency',
-            message: 'durable idempotency SET NX attempted',
-            data: { firstTime },
-            timestamp: Date.now(),
-        })
-        // #endregion agent log
-        if (!firstTime) {
-          return NextResponse.json({ ok: true, duplicate: true, durable: true })
-        }
-      } catch (e) {
-        if (debugProd) console.log('[cal-webhook][dbg] durable-idempotency error', { error: e instanceof Error ? e.message : String(e) })
-        // #region agent log
-        debugLog({
-          sessionId: DEBUG_SESSION_ID,
-            runId: 'pre-fix',
-            hypothesisId: 'H_upstash',
-            location: 'app/api/webhooks/cal/route.ts:POST:durable-idempotency',
-            message: 'Upstash durable idempotency failed',
-            data: { error: e instanceof Error ? e.message : String(e) },
-            timestamp: Date.now(),
-        })
-        // #endregion agent log
-        // Fail open in Phase 1: don't 500 the webhook if Upstash is down/misconfigured.
-      }
-    }
-
     switch (triggerEvent) {
       case 'BOOKING_REQUESTED':
       case 'BOOKING_CREATED':
-        // Phone lock (Phase 1): best-effort spam protection; requires Upstash + Cal API key.
+        if (hasResend) {
+          await sendConfirmationEmail(payload)
+        }
         const phone = extractPhoneFromCalPayload(payload)
-        if (debugProd) console.log('[cal-webhook][dbg] phone', { phonePresent: !!phone, phoneSuffix: phone ? phone.slice(-4) : null })
-        // #region agent log
-        debugLog({
-          sessionId: DEBUG_SESSION_ID,
-            runId: 'pre-fix',
-            hypothesisId: 'H_phone',
-            location: 'app/api/webhooks/cal/route.ts:POST:phone-extract',
-            message: 'extracted phone for lock',
-            data: {
-              phonePresent: !!phone,
-              phoneSuffix: phone ? phone.slice(-4) : null,
-            },
-            timestamp: Date.now(),
-        })
-        // #endregion agent log
-        if (phone && hasRedis) {
-          const lockKey = `lock:phone:${phone}`
-          let acquired: boolean | null = null
+        if (phone && hasSeoBridge) {
           try {
-            acquired = await redisSetIfNotExists({
-              key: lockKey,
-              value: { uid: payload.uid, createdAt: new Date().toISOString() },
-              ttlSeconds: 24 * 60 * 60,
+            const lockRecordResponse = await seoPlatformRequest('/api/internal/firebase/phone-lock-record', {
+              method: 'POST',
+              body: JSON.stringify({
+                phone,
+                bookingUid: payload.uid,
+                clientSlug: CLIENT_SLUG,
+                webpage: process.env.NEXT_PUBLIC_SITE_URL ?? 'closeby-demo-project',
+              }),
             })
+            void lockRecordResponse
           } catch (e) {
-            if (debugProd) console.log('[cal-webhook][dbg] phone-lock error', { error: e instanceof Error ? e.message : String(e) })
-            // #region agent log
-            debugLog({
-              sessionId: DEBUG_SESSION_ID,
-                runId: 'pre-fix',
-                hypothesisId: 'H_upstash',
-                location: 'app/api/webhooks/cal/route.ts:POST:phone-lock',
-                message: 'Upstash phone lock failed',
-                data: { error: e instanceof Error ? e.message : String(e) },
-                timestamp: Date.now(),
-            })
-            // #endregion agent log
-          }
-          if (debugProd) console.log('[cal-webhook][dbg] phone-lock', { acquired })
-          // #region agent log
-          debugLog({
-            sessionId: DEBUG_SESSION_ID,
-              runId: 'pre-fix',
-              hypothesisId: 'H_lock',
-              location: 'app/api/webhooks/cal/route.ts:POST:phone-lock',
-              message: 'phone lock SET NX attempted',
-              data: { acquired },
-              timestamp: Date.now(),
-          })
-          // #endregion agent log
-
-          if (acquired === false) {
-            try {
-              if (calApiKey) {
-                if (debugProd) console.log('[cal-webhook][dbg] declining booking', { uidSuffix: String(payload.uid).slice(-6) })
-                await declineCalBookingByUid({
-                  bookingUid: payload.uid,
-                  reason: 'Duplicate booking request (phone locked for 24h)',
-                  apiKey: calApiKey,
-                })
-                if (debugProd) console.log('[cal-webhook][dbg] declined booking ok', { uidSuffix: String(payload.uid).slice(-6) })
-              } else {
-                console.warn('[cal-webhook] Duplicate phone lock but Cal API key missing; cannot auto-decline', {
-                  phone,
-                  uid: payload.uid,
-                })
-              }
-            } catch (e) {
-              console.error('[cal-webhook] Failed to auto-decline duplicate booking', e)
-            }
-
-            // Always ack; do not send emails / schedule jobs for duplicates.
-            return NextResponse.json({ ok: true, phoneLocked: true })
+            if (debugProd) console.log('[cal-webhook][dbg] phone-lock bridge write failed', { error: e instanceof Error ? e.message : String(e) })
           }
         }
-
-        await sendConfirmationEmail(payload)
-        // Schedule 24h reminder using QStash (durable scheduling on Vercel)
+        // Schedule 24h reminder (best-effort in-process timer for local/demo usage).
         const reminderDelayMs = new Date(payload.startTime).getTime() - Date.now() - 24 * 3600 * 1000
-        if (reminderDelayMs > 0 && process.env.QSTASH_TOKEN) {
-          const baseUrl = buildPublicBaseUrl(clientConfig.website)
-          await qstashPublishJSON({
-            url: `${baseUrl}/api/jobs/send-reminder`,
-            body: payload,
-            delayMs: reminderDelayMs,
-          })
-        } else if (reminderDelayMs > 0) {
-          // Fallback (demo/dev): best-effort in-process timer
+        if (reminderDelayMs > 0 && hasResend) {
           setTimeout(() => sendReminderEmail(payload), reminderDelayMs)
         }
         break
@@ -326,20 +215,15 @@ export async function POST(req: NextRequest) {
         break
 
       case 'BOOKING_RESCHEDULED':
-        await sendConfirmationEmail(payload)
+        if (hasResend) {
+          await sendConfirmationEmail(payload)
+        }
         break
 
       default:
-        // BOOKING_CONFIRMED or other — schedule review request after session ends
+        // BOOKING_CONFIRMED or other — schedule review request after session ends (best-effort in-process timer).
         const reviewDelayMs = getReviewEmailDelay(payload.endTime)
-        if (reviewDelayMs > 0 && process.env.QSTASH_TOKEN) {
-          const baseUrl = buildPublicBaseUrl(clientConfig.website)
-          await qstashPublishJSON({
-            url: `${baseUrl}/api/jobs/send-review-request`,
-            body: payload,
-            delayMs: reviewDelayMs,
-          })
-        } else {
+        if (reviewDelayMs > 0 && hasResend) {
           setTimeout(() => sendReviewRequestEmail(payload), reviewDelayMs)
         }
     }

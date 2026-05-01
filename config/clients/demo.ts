@@ -48,9 +48,9 @@ export const demoConfig: ClientConfig = {
     calComUsername: 'gabu-iieqyx',
     // Canonical slugs are expected to be generated/provisioned per client.
     calComCanonicalEventSlugs: {
-      initial: '60min',
+      initial: '30min',
       session: '30min',
-      couple: 'terapie-cuplu',
+      couple: '30min',
     },
     // (pre-deploy): set to the real Google Place ID for this cabinet.
     googlePlaceId: undefined,

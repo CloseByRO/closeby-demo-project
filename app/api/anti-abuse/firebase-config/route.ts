@@ -17,9 +17,10 @@ export async function GET() {
       { headers: { 'Cache-Control': 'no-store' } },
     )
   } catch (error) {
+    const message = error instanceof Error ? error.message : String(error)
     return NextResponse.json(
-      { error: error instanceof Error ? error.message : String(error) },
-      { status: 500 },
+      { error: message, upstream: 'seo-data-platform' },
+      { status: 503 },
     )
   }
 }
