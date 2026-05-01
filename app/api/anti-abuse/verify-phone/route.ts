@@ -74,35 +74,12 @@ export async function POST(req: NextRequest) {
       )
     }
 
-    const verifiedPhone = typeof data?.phone === 'string' && data.phone ? data.phone : phoneRaw
-    const lockCheckResponse = await seoPlatformRequest('/api/internal/firebase/phone-lock', {
-      method: 'POST',
-      body: JSON.stringify({ idToken, phone: verifiedPhone }),
-    })
-    const lockPayload = (await lockCheckResponse.json().catch(() => null)) as
-      | { locked?: boolean; createdAt?: string }
-      | null
-    if (!lockCheckResponse.ok) {
-      return NextResponse.json(
-        { verified: false, error: 'Phone lock check failed' },
-        { status: lockCheckResponse.status },
-      )
-    }
-
-    const responsePayload = {
-      verified: true,
-      phone: verifiedPhone,
-      locked: lockPayload?.locked === true,
-      createdAt: typeof lockPayload?.createdAt === 'string' ? lockPayload.createdAt : undefined,
-    }
+    const responsePayload = { verified: true, phone: data?.phone ?? phoneRaw }
     const responseOut = NextResponse.json(responsePayload)
-    if (responsePayload.locked) {
-      return responseOut
-    }
     const secret = getBookingSessionSecret()
     if (secret) {
       const expiresAtSeconds = Math.floor(Date.now() / 1000) + BOOKING_SESSION_MAX_AGE_SECONDS
-      const sessionValue = createBookingSessionValue(verifiedPhone, expiresAtSeconds, secret)
+      const sessionValue = createBookingSessionValue(responsePayload.phone, expiresAtSeconds, secret)
       responseOut.cookies.set(BOOKING_SESSION_COOKIE, sessionValue, {
         httpOnly: true,
         secure: true,
