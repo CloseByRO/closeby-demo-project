@@ -66,6 +66,7 @@ export function BookingSection({ config }: { config: ClientConfig }) {
   const [guardError, setGuardError] = useState<string | null>(null)
   const [backendAllowed, setBackendAllowed] = useState(false)
   const [backendLocked, setBackendLocked] = useState(false)
+  const [backendLockCreatedAt, setBackendLockCreatedAt] = useState<string | null>(null)
 
   const calContainerRef = useRef<HTMLDivElement | null>(null)
   const recaptchaVerifierRef = useRef<unknown>(null)
@@ -163,11 +164,6 @@ export function BookingSection({ config }: { config: ClientConfig }) {
       cal('on', {
         action: 'bookingSuccessfulV2',
         callback: () => {
-          const until = Date.now() + LOCAL_BOOKING_LOCK_TTL_MS
-          safeWriteLockUntil(until)
-          setLockUntilMs(until)
-          safeWriteOverrideAllowed(false)
-          setOverrideAllowed(false)
           setSuppressLockOverlay(true)
         },
       })
@@ -227,32 +223,33 @@ export function BookingSection({ config }: { config: ClientConfig }) {
         headers: { 'Content-Type': 'application/json', ...(appCheckToken ? { 'x-firebase-appcheck': appCheckToken } : {}) },
         body: JSON.stringify({ idToken, phone: phoneForGuard }),
       })
-      const payload = await verifyResponse.json().catch(() => ({}))
+      const payload = (await verifyResponse.json().catch(() => ({}))) as {
+        error?: string
+        locked?: boolean
+        createdAt?: string
+      }
 
       if (!verifyResponse.ok) {
         setGuardError(payload?.error ?? 'Verificarea a eșuat.')
         return
       }
 
-      const lockResponse = await fetch('/api/anti-abuse/phone-lock', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ phone: phoneForGuard, idToken }),
-      })
-      const lockPayload = await lockResponse.json().catch(() => ({}))
-      if (!lockResponse.ok) {
-        setGuardError(lockPayload?.error ?? 'Nu am putut verifica blocarea numărului.')
-        return
-      }
-
-      if (lockPayload.locked) {
+      if (payload.locked) {
+        const createdAtMs = typeof payload.createdAt === 'string' ? Date.parse(payload.createdAt) : Number.NaN
+        const lockUntil = Number.isFinite(createdAtMs) ? createdAtMs + LOCAL_BOOKING_LOCK_TTL_MS : Date.now() + LOCAL_BOOKING_LOCK_TTL_MS
+        safeWriteLockUntil(lockUntil)
+        safeWriteOverrideAllowed(false)
+        setLockUntilMs(lockUntil)
+        setOverrideAllowed(false)
         setBackendLocked(true)
         setBackendAllowed(false)
+        setBackendLockCreatedAt(typeof payload.createdAt === 'string' ? payload.createdAt : null)
         return
       }
 
       setBackendAllowed(true)
       setBackendLocked(false)
+      setBackendLockCreatedAt(null)
     } catch (e) {
       setGuardError(formatFirebaseAuthError(e, 'Verificarea a eșuat.'))
     } finally {
@@ -397,8 +394,8 @@ export function BookingSection({ config }: { config: ClientConfig }) {
                 <div className="absolute inset-0 flex items-center justify-center bg-sage-xl">
                   <div className="text-center text-sage-d max-w-md px-6">
                     <div className="text-3xl mb-3">⏳</div>
-                    <p className="text-sm font-medium">Acest numar are deja o cerere activa in ultimele 24h</p>
-                    <p className="text-xs mt-2 text-sage-d/80">Din motive de protectie anti-abuz, te rugam sa revii mai tarziu sau sa ne contactezi direct.</p>
+                    <p className="text-sm font-medium">Ai deja o programare înregistrată. Poți face o nouă programare după 24 de ore.</p>
+                    {backendLockCreatedAt && <p className="text-xs mt-2 text-sage-d/80">Înregistrată la: {new Date(backendLockCreatedAt).toLocaleString('ro-RO')}</p>}
                   </div>
                 </div>
               )}
