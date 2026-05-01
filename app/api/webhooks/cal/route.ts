@@ -1,4 +1,6 @@
 import { type NextRequest, NextResponse } from 'next/server'
+import { cookies } from 'next/headers'
+import { createHmac, timingSafeEqual } from 'crypto'
 import { verifyCalWebhookSignature, parseCalWebhookPayload, getReviewEmailDelay } from '@/lib/services/calcom'
 import { sendConfirmationEmail, sendReminderEmail, sendReviewRequestEmail } from '@/lib/services/resend'
 import clientConfig from '@/config/client'
@@ -28,6 +30,34 @@ function debugLog(payload: Record<string, unknown>) {
   }).catch(() => {})
 }
 
+const CAL_SESSION_COOKIE = 'cal_session'
+const CAL_SESSION_MAX_AGE = 7200
+const HMAC_SHA256_HEX_LEN = 64
+const HMAC_SHA256_HEX_RE = new RegExp(`^[0-9a-f]{${HMAC_SHA256_HEX_LEN}}$`, 'i')
+
+function signCalSessionToken(bookingUid: string): string | null {
+  const secret = process.env.CAL_WEBHOOK_SECRET
+  if (!secret) return null
+  const hmacHex = createHmac('sha256', secret).update(bookingUid, 'utf8').digest('hex')
+  return `${bookingUid}.${hmacHex}`
+}
+
+function verifyCalSessionCookie(cookieValue: string, bookingUid: string): boolean {
+  const secret = process.env.CAL_WEBHOOK_SECRET
+  if (!secret) return false
+  const lastDot = cookieValue.lastIndexOf('.')
+  if (lastDot <= 0) return false
+  const uidFromCookie = cookieValue.slice(0, lastDot)
+  const hmacHex = cookieValue.slice(lastDot + 1)
+  if (uidFromCookie !== bookingUid) return false
+  if (!HMAC_SHA256_HEX_RE.test(hmacHex)) return false
+  const expectedHex = createHmac('sha256', secret).update(bookingUid, 'utf8').digest('hex')
+  const a = Buffer.from(hmacHex, 'hex')
+  const b = Buffer.from(expectedHex, 'hex')
+  if (a.length !== b.length) return false
+  return timingSafeEqual(a, b)
+}
+
 export async function POST(req: NextRequest) {
   try {
     const rawBody = await req.text()
@@ -38,6 +68,18 @@ export async function POST(req: NextRequest) {
       body = JSON.parse(rawBody)
     } catch {
       return NextResponse.json({ error: 'Invalid JSON' }, { status: 400 })
+    }
+
+    const event = parseCalWebhookPayload(body)
+    if (!event) {
+      return NextResponse.json({ error: 'Invalid payload' }, { status: 400 })
+    }
+
+    const bookingUid = event.payload.uid
+    const cookieStore = await cookies()
+    const sessionCookie = cookieStore.get(CAL_SESSION_COOKIE)?.value
+    if (sessionCookie && verifyCalSessionCookie(sessionCookie, bookingUid)) {
+      return NextResponse.json({ ok: true, duplicate: true })
     }
 
     const { webhookSecret, apiKey: calApiKey, tenantSource, resolvedClientSlug } =
@@ -92,12 +134,6 @@ export async function POST(req: NextRequest) {
       if (!ok) {
         return NextResponse.json({ error: 'Invalid signature' }, { status: 401 })
       }
-    }
-
-    const event = parseCalWebhookPayload(body)
-
-    if (!event) {
-      return NextResponse.json({ error: 'Invalid payload' }, { status: 400 })
     }
 
     const { triggerEvent, payload } = event
@@ -308,7 +344,17 @@ export async function POST(req: NextRequest) {
         }
     }
 
-    return NextResponse.json({ ok: true, event: triggerEvent })
+    const res = NextResponse.json({ ok: true, event: triggerEvent })
+    const calSessionToken = signCalSessionToken(payload.uid)
+    if (calSessionToken) {
+      res.cookies.set(CAL_SESSION_COOKIE, calSessionToken, {
+        httpOnly: true,
+        secure: true,
+        sameSite: 'strict',
+        maxAge: CAL_SESSION_MAX_AGE,
+      })
+    }
+    return res
   } catch (err) {
     console.error('[cal-webhook] Error:', err)
     return NextResponse.json({ error: 'Internal error' }, { status: 500 })

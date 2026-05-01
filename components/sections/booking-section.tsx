@@ -62,6 +62,7 @@ export function BookingSection({ config }: { config: ClientConfig }) {
   const [phoneStep, setPhoneStep] = useState<'phone' | 'code'>('phone')
   const [confirmation, setConfirmation] = useState<ConfirmationResult | null>(null)
   const [isCheckingGuard, setIsCheckingGuard] = useState(false)
+  const [isRestoringSession, setIsRestoringSession] = useState(true)
   const [guardError, setGuardError] = useState<string | null>(null)
   const [backendAllowed, setBackendAllowed] = useState(false)
   const [backendLocked, setBackendLocked] = useState(false)
@@ -95,6 +96,35 @@ export function BookingSection({ config }: { config: ClientConfig }) {
   useEffect(() => {
     setLockUntilMs(safeReadLockUntil())
     setOverrideAllowed(safeReadOverrideAllowed())
+  }, [])
+
+  useEffect(() => {
+    let cancelled = false
+    ;(async () => {
+      try {
+        const response = await fetch('/api/anti-abuse/verify-phone', {
+          method: 'GET',
+          headers: { 'Cache-Control': 'no-store' },
+        })
+        if (!response.ok) return
+        const payload = (await response.json().catch(() => null)) as { verified?: boolean; phone?: string } | null
+        if (cancelled) return
+        if (payload?.verified) {
+          setBackendAllowed(true)
+          setBackendLocked(false)
+          if (typeof payload.phone === 'string' && payload.phone) {
+            setPhoneForGuard(payload.phone)
+          }
+        }
+      } finally {
+        if (!cancelled) {
+          setIsRestoringSession(false)
+        }
+      }
+    })()
+    return () => {
+      cancelled = true
+    }
   }, [])
 
   useEffect(() => () => clearRecaptchaVerifier(), [])
@@ -301,7 +331,16 @@ export function BookingSection({ config }: { config: ClientConfig }) {
                 </div>
               )}
 
-              {calVisible && !locallyLocked && !backendAllowed && !backendLocked && (
+              {calVisible && !locallyLocked && isRestoringSession && (
+                <div className="absolute inset-0 flex items-center justify-center bg-sage-xl">
+                  <div className="text-center text-sage-d">
+                    <div className="text-3xl mb-3 animate-pulse">🔐</div>
+                    <p className="text-sm font-medium">Verificam sesiunea...</p>
+                  </div>
+                </div>
+              )}
+
+              {calVisible && !locallyLocked && !isRestoringSession && !backendAllowed && !backendLocked && (
                 <div className="absolute inset-0 flex items-center justify-center bg-sage-xl">
                   {phoneStep === 'phone' ? (
                     <form onSubmit={handleSendSms} className="w-full max-w-md rounded-xl bg-white p-6 shadow-lg">
