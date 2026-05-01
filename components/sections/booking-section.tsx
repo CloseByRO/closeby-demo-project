@@ -6,6 +6,7 @@ import type { ClientConfig } from '@/types/client-config'
 import { useMergedClientConfig } from '@/components/providers/client-config-provider'
 import { LOCAL_BOOKING_LOCK_TTL_MS, isLocallyLocked, readLockUntil, readOverrideAllowed, writeLockUntil, writeOverrideAllowed } from '@/lib/antiAbuse/localBookingLock'
 import { tryGetFirebaseAppCheckTokenForRequest } from '@/lib/firebase/appCheckClient'
+import { formatFirebaseAuthError } from '@/lib/firebase/authErrorMessage'
 import { getFirebaseAuth } from '@/lib/firebase/client'
 import { confirmPhoneOtp, FIREBASE_PHONE_RECAPTCHA_BUTTON_ID, startPhoneOtp } from '@/lib/firebase/phoneAuthClient'
 import { buildBookingOptions } from '@/lib/booking-options'
@@ -167,7 +168,7 @@ export function BookingSection({ config }: { config: ClientConfig }) {
       setPhoneStep('code')
     } catch (e) {
       clearRecaptchaVerifier()
-      setGuardError(e instanceof Error ? e.message : 'Nu am putut trimite SMS-ul de verificare.')
+      setGuardError(formatFirebaseAuthError(e, 'Nu am putut trimite SMS-ul de verificare.'))
     } finally {
       setIsCheckingGuard(false)
     }
@@ -223,7 +224,7 @@ export function BookingSection({ config }: { config: ClientConfig }) {
       setBackendAllowed(true)
       setBackendLocked(false)
     } catch (e) {
-      setGuardError(e instanceof Error ? e.message : 'Verificarea a eșuat.')
+      setGuardError(formatFirebaseAuthError(e, 'Verificarea a eșuat.'))
     } finally {
       setIsCheckingGuard(false)
     }
